@@ -54,6 +54,11 @@ io.on("connection", (socket) => {
       event: broadcastEventTypes.ACTIVE_USERS,
       activeUsers: peers
     });
+
+    io.sockets.emit("broadcast", {
+      event: broadcastEventTypes.GROUP_CALL_ROOMS,
+      groupCallRooms,
+    });
   });
 
   socket.on('disconnect', () => {
@@ -62,6 +67,15 @@ io.on("connection", (socket) => {
     io.sockets.emit("broadcast", {
       event: broadcastEventTypes.ACTIVE_USERS,
       activeUsers: peers,
+    });
+
+    groupCallRooms = groupCallRooms.filter(
+      (room) => room.peerId !== data.peerId
+    );
+
+    io.sockets.emit("broadcast", {
+      event: broadcastEventTypes.GROUP_CALL_ROOMS,
+      groupCallRooms,
     });
   }
   )
@@ -130,4 +144,44 @@ io.on("connection", (socket) => {
       groupCallRooms,
     });
   });
+
+  socket.on("group-call-join-request", (data) => {
+    io.to(data.roomId).emit("group-call-join-request", {
+      peerId: data.peerId,
+      streamId: data.streamId,
+    });
+
+    socket.join(data.roomId);
+  });
+
+  socket.on("group-call-user-left", (data) => {
+    socket.leave(data.roomId);
+
+    io.to(data.roomId).emit("group-call-user-left", {
+      streamId: data.streamId,
+    });
+  });
+
+  socket.on("group-call-closed-by-host", (data) => {
+    groupCallRooms = groupCallRooms.filter(
+      (room) => room.peerId !== data.peerId
+    );
+
+    io.sockets.emit("broadcast", {
+      event: broadcastEventTypes.GROUP_CALL_ROOMS,
+      groupCallRooms,
+    });
+  });
+
+  // white board data
+  socket.on('canvas-data', (data) => {
+    socket.broadcast.emit('canvas-data', data);
+  })
+
+  // messsage
+  io.on('connection', socket => {
+    socket.on('message', ({ name, message, timeSend, roomId }) => {
+      io.emit('message', { name, message, timeSend, roomId })
+    })
+  })
 });
